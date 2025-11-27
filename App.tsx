@@ -1,7 +1,6 @@
 import React, {useEffect} from 'react';
 import {NavigationContainer} from '@react-navigation/native';
-import {StatusBar} from 'expo-status-bar';
-import {Platform} from 'react-native';
+import {Platform, StatusBar} from 'react-native';
 import {AuthProvider} from './src/context/AuthContext';
 import {PokemonProvider} from './src/context/PokemonContext';
 import AppNavigator from './src/navigation/AppNavigator';
@@ -18,7 +17,9 @@ const App: React.FC = () => {
       <AuthProvider>
         <PokemonProvider>
           <NavigationContainer>
-            <StatusBar style={Platform.OS === 'ios' ? 'dark' : 'light'} />
+            <StatusBar
+              barStyle={Platform.OS === 'ios' ? 'dark-content' : 'light-content'}
+            />
             <AppNavigator />
           </NavigationContainer>
         </PokemonProvider>

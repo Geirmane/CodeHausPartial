@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useCallback} from 'react';
 import {
   View,
   Text,
@@ -11,17 +11,23 @@ import {
   Alert,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
+import Voice, {
+  SpeechErrorEvent,
+  SpeechResultsEvent,
+} from '@react-native-voice/voice';
 import {usePokemon} from '../../context/PokemonContext';
 import {useTheme} from '../../context/ThemeContext';
 import {Pokemon} from '../../types';
 import {fetchPokemonList} from '../../services/pokeApiService';
 import {POKEMON_LIMIT} from '../../constants/config';
+import {requestMicrophonePermission} from '../../utils/permissions';
 
 const PokedexScreen: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [pokemonIds, setPokemonIds] = useState<number[]>([]);
   const [displayedPokemon, setDisplayedPokemon] = useState<Pokemon[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isListening, setIsListening] = useState(false);
   const {getPokemon, searchPokemonByName} = usePokemon();
   const {colors} = useTheme();
   const navigation = useNavigation();
@@ -29,6 +35,15 @@ const PokedexScreen: React.FC = () => {
   useEffect(() => {
     loadPokemonList();
   }, []);
+
+  useEffect(() => {
+    Voice.onSpeechResults = handleSpeechResults;
+    Voice.onSpeechError = handleSpeechError;
+
+    return () => {
+      Voice.destroy().finally(() => Voice.removeAllListeners());
+    };
+  }, [handleSpeechResults, handleSpeechError]);
 
   useEffect(() => {
     if (searchQuery.trim()) {
@@ -73,13 +88,45 @@ const PokedexScreen: React.FC = () => {
     }
   };
 
-  // Note: Voice search requires native modules not available in Expo
-  // This is a placeholder - in production, you could use a web-based solution
-  const startVoiceSearch = () => {
-    Alert.alert(
-      'Voice Search',
-      'Voice search is not available in Expo. Please type your search instead.',
-    );
+  const handleSpeechResults = useCallback(
+    (event: SpeechResultsEvent) => {
+      const text = event.value?.[0];
+      if (text) {
+        setSearchQuery(text.toLowerCase());
+      }
+      setIsListening(false);
+    },
+    [setSearchQuery],
+  );
+
+  const handleSpeechError = useCallback((event: SpeechErrorEvent) => {
+    console.warn('Voice error:', event.error);
+    setIsListening(false);
+  }, []);
+
+  const startVoiceSearch = async () => {
+    try {
+      const hasPermission = await requestMicrophonePermission();
+      if (!hasPermission) {
+        Alert.alert('Permission Required', 'Microphone permission is needed for voice search.');
+        return;
+      }
+      setIsListening(true);
+      await Voice.start('en-US');
+    } catch (error) {
+      console.error('Voice start error:', error);
+      setIsListening(false);
+    }
+  };
+
+  const stopVoiceSearch = async () => {
+    try {
+      await Voice.stop();
+    } catch (error) {
+      console.error('Voice stop error:', error);
+    } finally {
+      setIsListening(false);
+    }
   };
 
   const renderPokemonItem = ({item}: {item: Pokemon}) => (
@@ -122,8 +169,8 @@ const PokedexScreen: React.FC = () => {
           />
           <TouchableOpacity
             style={[styles.voiceButton, {backgroundColor: colors.primary}]}
-            onPress={startVoiceSearch}>
-            <Text style={styles.voiceButtonText}>🎤</Text>
+            onPress={isListening ? stopVoiceSearch : startVoiceSearch}>
+            <Text style={styles.voiceButtonText}>{isListening ? '■' : '🎤'}</Text>
           </TouchableOpacity>
         </View>
       </View>

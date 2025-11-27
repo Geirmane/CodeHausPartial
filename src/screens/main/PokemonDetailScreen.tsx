@@ -17,7 +17,7 @@ import {Pokemon} from '../../types';
 import {addDiscoveredPokemon} from '../../services/userService';
 import {shareDiscovery} from '../../services/communityService';
 import {checkAndAwardBadges} from '../../services/gamificationService';
-import * as Sharing from 'expo-sharing';
+import Share from 'react-native-share';
 
 const PokemonDetailScreen: React.FC = () => {
   const route = useRoute();
@@ -66,17 +66,14 @@ const PokemonDetailScreen: React.FC = () => {
     if (!pokemon || !user) return;
 
     try {
-      // Share to external apps
-      const isAvailable = await Sharing.isAvailableAsync();
-      if (isAvailable && pokemon.sprites.front_default) {
-        // Note: Sharing image URL directly may not work - you'd need to download it first
-        // For now, we'll share text
-        await Sharing.shareAsync(pokemon.sprites.front_default, {
-          mimeType: 'image/png',
-        }).catch(() => {
-          // If image sharing fails, just share text
-          Alert.alert('Share', `I discovered ${pokemon.name}! #PokeExplorer`);
+      if (pokemon.sprites.front_default) {
+        await Share.open({
+          url: pokemon.sprites.front_default,
+          message: `I discovered ${pokemon.name}! #PokeExplorer`,
+          failOnCancel: false,
         });
+      } else {
+        Alert.alert('Share', `I discovered ${pokemon.name}! #PokeExplorer`);
       }
       
       // Also share to community feed

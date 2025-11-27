@@ -13,7 +13,7 @@ import {
 import {useAuth} from '../../context/AuthContext';
 import {useTheme} from '../../context/ThemeContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Sharing from 'expo-sharing';
+import Share from 'react-native-share';
 
 interface CapturedPhoto {
   id: string;
@@ -58,14 +58,11 @@ const GalleryScreen: React.FC = () => {
 
   const handleShare = async (photo: CapturedPhoto) => {
     try {
-      const isAvailable = await Sharing.isAvailableAsync();
-      if (isAvailable) {
-        await Sharing.shareAsync(photo.photoUri, {
-          message: `I captured ${photo.pokemonName} in AR! #PokeExplorer`,
-        });
-      } else {
-        Alert.alert('Sharing not available', 'Sharing is not available on this device');
-      }
+      await Share.open({
+        url: photo.photoUri,
+        message: `I captured ${photo.pokemonName} in AR! #PokeExplorer`,
+        failOnCancel: false,
+      });
     } catch (error) {
       console.error('Error sharing photo:', error);
     }

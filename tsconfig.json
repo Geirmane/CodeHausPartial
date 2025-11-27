@@ -1,4 +1,5 @@
 {
+  "extends": "@react-native/typescript-config/tsconfig.json",
   "compilerOptions": {
     "target": "esnext",
     "module": "commonjs",
@@ -51,6 +52,5 @@
     "node_modules",
     "babel.config.js",
     "metro.config.js"
-  ],
-  "extends": "expo/tsconfig.base"
+  ]
 }

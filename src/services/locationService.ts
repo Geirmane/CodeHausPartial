@@ -1,56 +1,75 @@
-import * as Location from 'expo-location';
+import {PermissionsAndroid, Platform} from 'react-native';
+import Geolocation, {GeoPosition, WatchOptions} from 'react-native-geolocation-service';
 import {Location as LocationType, PokemonEncounter} from '../types';
 import {BIOMES, BIOME_POKEMON_TYPES} from '../constants/config';
 
 export const requestLocationPermission = async (): Promise<boolean> => {
-  const {status} = await Location.requestForegroundPermissionsAsync();
-  return status === 'granted';
+  if (Platform.OS === 'ios') {
+    const status = await Geolocation.requestAuthorization('whenInUse');
+    return status === 'granted';
+  }
+
+  const granted = await PermissionsAndroid.request(
+    PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+    {
+      title: 'Location Permission',
+      message: 'PokeExplorer needs access to your location to find Pokemon nearby.',
+      buttonPositive: 'Allow',
+    },
+  );
+  return granted === PermissionsAndroid.RESULTS.GRANTED;
 };
 
 export const getCurrentLocation = async (): Promise<LocationType> => {
-  const {status} = await Location.requestForegroundPermissionsAsync();
-  if (status !== 'granted') {
+  const hasPermission = await requestLocationPermission();
+  if (!hasPermission) {
     throw new Error('Permission to access location was denied');
   }
 
-  const location = await Location.getCurrentPositionAsync({
-    accuracy: Location.Accuracy.High,
+  return new Promise((resolve, reject) => {
+    Geolocation.getCurrentPosition(
+      (position: GeoPosition) => {
+        resolve({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy ?? undefined,
+        });
+      },
+      error => reject(error),
+      {enableHighAccuracy: true, timeout: 15000, maximumAge: 10000},
+    );
   });
-
-  return {
-    latitude: location.coords.latitude,
-    longitude: location.coords.longitude,
-    accuracy: location.coords.accuracy || undefined,
-  };
 };
 
-let watchSubscription: Location.LocationSubscription | null = null;
+let watchId: number | null = null;
 
 export const watchPosition = (
   callback: (location: LocationType) => void,
+  options: WatchOptions = {enableHighAccuracy: true, distanceFilter: 10},
 ): number => {
-  Location.requestForegroundPermissionsAsync().then(async ({status}) => {
-    if (status === 'granted') {
-      watchSubscription = await Location.watchPositionAsync(
-        {
-          accuracy: Location.Accuracy.High,
-          distanceInterval: 10, // Update every 10 meters
-        },
-        location => {
-          callback({
-            latitude: location.coords.latitude,
-            longitude: location.coords.longitude,
-            accuracy: location.coords.accuracy || undefined,
-          });
-        },
-      );
-    }
-  });
+  watchId = Geolocation.watchPosition(
+    position => {
+      callback({
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        accuracy: position.coords.accuracy ?? undefined,
+      });
+    },
+    error => console.warn('Location watch error', error),
+    options,
+  );
 
-  return watchSubscription ? 1 : 0; // Return a number for compatibility
+  return watchId ?? 0;
 };
 
-export const determineBiome = (location: Location): string => {
+export const clearLocationWatch = () => {
+  if (watchId !== null) {
+    Geolocation.clearWatch(watchId);
+    watchId = null;
+  }
+};
+
+export const determineBiome = (location: LocationType): string => {
   // Simple biome determination based on location
   // In a real app, you might use Google Maps API or other services
   // For now, we'll use a simple heuristic based on coordinates
@@ -78,7 +97,7 @@ export const getBiomePokemonTypes = (biome: string): string[] => {
 };
 
 export const generatePokemonEncounter = (
-  location: Location,
+  location: LocationType,
   pokemonIds: number[],
 ): PokemonEncounter | null => {
   const biome = determineBiome(location);

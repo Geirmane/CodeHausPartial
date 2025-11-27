@@ -86,13 +86,14 @@ PokeExplorer/
 
 ## Key Libraries
 
-- **React Navigation**: Navigation between screens
-- **Firebase**: Authentication and Realtime Database
-- **PokeAPI**: Pokémon data
-- **react-native-maps**: Map view for geolocation
-- **react-native-vision-camera**: Camera functionality
-- **react-native-permissions**: Handle device permissions
-- **AsyncStorage**: Local data persistence
+- **React Navigation** for routing between auth/main flows
+- **Firebase JS SDK** for authentication and Realtime Database
+- **PokeAPI** for Pokémon data
+- **react-native-vision-camera** for AR captures
+- **react-native-geolocation-service** + **react-native-maps** for hunts
+- **@react-native-voice/voice** for voice search
+- **react-native-push-notification** for encounter alerts
+- **react-native-share** and **AsyncStorage** for captures & sharing
 
 ## Development Guidelines
 

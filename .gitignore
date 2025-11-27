@@ -35,6 +35,7 @@ local.properties
 node_modules/
 npm-debug.log
 yarn-error.log
+.npm-cache-local/
 
 # fastlane
 **/fastlane/report.xml

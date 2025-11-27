@@ -17,10 +17,12 @@ import {
   getCurrentLocation,
   watchPosition,
   generatePokemonEncounter,
+  clearLocationWatch,
 } from '../../services/locationService';
 import {PokemonEncounter} from '../../types';
 import {fetchPokemonList} from '../../services/pokeApiService';
 import PushNotification from 'react-native-push-notification';
+import {NOTIFICATION_CONFIG} from '../../constants/config';
 
 const HuntScreen: React.FC = () => {
   const [location, setLocation] = useState<{latitude: number; longitude: number} | null>(null);
@@ -35,7 +37,7 @@ const HuntScreen: React.FC = () => {
   useEffect(() => {
     initializeHunt();
     return () => {
-      // Cleanup watch position if needed
+      clearLocationWatch();
     };
   }, []);
 
@@ -103,6 +105,7 @@ const HuntScreen: React.FC = () => {
     // Send notification for nearby Pokemon
     if (newEncounters.length > 0) {
       PushNotification.localNotification({
+        channelId: NOTIFICATION_CONFIG.CHANNEL_ID,
         title: 'Pokemon Nearby!',
         message: `${newEncounters.length} Pokemon discovered in your area!`,
         playSound: true,

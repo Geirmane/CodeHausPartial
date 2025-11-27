@@ -7,10 +7,16 @@ import {
   Alert,
   ActivityIndicator,
   Image,
+  Platform,
 } from 'react-native';
-import {CameraView, CameraType, useCameraPermissions} from 'expo-camera';
+import {
+  Camera,
+  useCameraDevice,
+  useCameraPermission,
+  CameraCaptureError,
+} from 'react-native-vision-camera';
+import Share from 'react-native-share';
 import {useNavigation} from '@react-navigation/native';
-import * as Sharing from 'expo-sharing';
 import {usePokemon} from '../../context/PokemonContext';
 import {useAuth} from '../../context/AuthContext';
 import {useTheme} from '../../context/ThemeContext';
@@ -24,9 +30,10 @@ const ARScreen: React.FC = () => {
   const [pokemonIds, setPokemonIds] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [capturing, setCapturing] = useState(false);
-  const [facing, setFacing] = useState<CameraType>('back');
-  const [permission, requestPermission] = useCameraPermissions();
-  const cameraRef = useRef<CameraView>(null);
+  const [facing] = useState<'front' | 'back'>('back');
+  const cameraRef = useRef<Camera>(null);
+  const device = useCameraDevice(facing);
+  const {hasPermission, requestPermission} = useCameraPermission();
   const {getPokemon} = usePokemon();
   const {user, updateUser} = useAuth();
   const {colors} = useTheme();
@@ -39,13 +46,10 @@ const ARScreen: React.FC = () => {
   const initializeAR = async () => {
     try {
       // Request camera permission
-      if (!permission?.granted) {
-        const result = await requestPermission();
-        if (!result.granted) {
-          Alert.alert(
-            'Permission Required',
-            'Camera permission is required for AR features',
-          );
+      if (!hasPermission) {
+        const granted = await requestPermission();
+        if (!granted) {
+          Alert.alert('Permission Required', 'Camera permission is required for AR features');
           setLoading(false);
           return;
         }
@@ -79,14 +83,11 @@ const ARScreen: React.FC = () => {
 
     setCapturing(true);
     try {
-      const photo = await cameraRef.current.takePictureAsync({
-        quality: 0.8,
-        base64: false,
+      const photo = await cameraRef.current.takePhoto({
+        qualityPrioritization: 'balanced',
       });
 
-      if (!photo?.uri) {
-        throw new Error('Failed to capture photo');
-      }
+      const photoUri = Platform.OS === 'android' ? `file://${photo.path}` : photo.path;
 
       // Mark Pokemon as discovered
       if (user) {
@@ -99,7 +100,7 @@ const ARScreen: React.FC = () => {
           pokemon.id,
           pokemon.name,
           pokemon.sprites.front_default,
-          photo.uri,
+          photoUri,
         );
       }
 
@@ -109,7 +110,7 @@ const ARScreen: React.FC = () => {
         [
           {
             text: 'Share',
-            onPress: () => handleShare(photo.uri),
+            onPress: () => handleShare(photoUri),
           },
           {
             text: 'OK',
@@ -118,7 +119,11 @@ const ARScreen: React.FC = () => {
         ],
       );
     } catch (error) {
-      console.error('Error capturing photo:', error);
+      if (error instanceof CameraCaptureError) {
+        console.error('Camera error:', error);
+      } else {
+        console.error('Error capturing photo:', error);
+      }
       Alert.alert('Error', 'Failed to capture photo');
     } finally {
       setCapturing(false);
@@ -129,14 +134,11 @@ const ARScreen: React.FC = () => {
     if (!pokemon) return;
 
     try {
-      const isAvailable = await Sharing.isAvailableAsync();
-      if (isAvailable) {
-        await Sharing.shareAsync(photoUri, {
-          message: `I captured ${pokemon.name} in AR! #PokeExplorer`,
-        });
-      } else {
-        Alert.alert('Sharing not available', 'Sharing is not available on this device');
-      }
+      await Share.open({
+        url: photoUri,
+        message: `I captured ${pokemon.name} in AR! #PokeExplorer`,
+        failOnCancel: false,
+      });
     } catch (error) {
       console.error('Error sharing:', error);
     }
@@ -153,7 +155,7 @@ const ARScreen: React.FC = () => {
     );
   }
 
-  if (!permission?.granted) {
+  if (!hasPermission) {
     return (
       <View style={[styles.container, styles.loadingContainer, {backgroundColor: colors.background}]}>
         <Text style={[styles.errorText, {color: colors.error}]}>
@@ -170,11 +172,19 @@ const ARScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <CameraView
-        ref={cameraRef}
-        style={styles.camera}
-        facing={facing}
-      />
+      {device ? (
+        <Camera
+          ref={cameraRef}
+          style={styles.camera}
+          device={device}
+          isActive
+          photo
+        />
+      ) : (
+        <View style={[styles.camera, styles.loadingContainer]}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      )}
 
       {/* AR Overlay - Pokemon Sprite */}
       {pokemon && (
